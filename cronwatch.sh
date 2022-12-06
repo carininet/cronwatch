@@ -12,7 +12,7 @@ MYNODE=$(hostname -f)
 
 # Constants
 PSREX='([0-9]+)\s+([0-9]+)\s+(\w+\s+\w+\s+[0-9]+\s+[0-9]+:[0-9]+:[0-9]+\s+[0-9]+)\s+(.+)'
-TIMEOUT=120
+TIMEOUT=180
 SENDTO='sysadmin@example.com'
 
 # Get cron processes
@@ -29,7 +29,7 @@ while read process; do
 		# Exclude main crontab process
 		if [[ ${ppid[$npid]} > 1 ]]; then
 			# Get process duration (minutes)
-			running=$(($(($(date +%s) - $(date -d "${lstart}" +%s))) / 60))
+			running=$(($(($(date +%s) - $(date -d "${lstart[$npid]}" +%s))) / 60))
 			if [[ $running > $TIMEOUT ]]; then
 				# Log to rsyslog and send warning mail
 				subject="${MYNODE} crontab is running for ${running} minutes"
