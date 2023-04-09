@@ -7,22 +7,16 @@
 
 # -= Functions =-
 
-# Convert a array to comma-separated string
-function a2s
-{
-	local IFS=","
-	a2sresult="${*}"
-}
-
 # Log and notify process identified by pid and parent
 notify()
 {
 	# Build pidlist and ppidlist as comma-separated string
-	allpids=(${pids[@]} ${ppids[@]})
-	a2s "${allpids[@]}"
-	allpidl=${a2sresult}
-	processes=$(ps --forest --format 'pid,ppid,user:10,tty,stat,pcpu,nlwp,time,pmem,rss:10,drs:10,size:10,lstart,cmd' --pid=${allpidl} --ppid=${allpidl})
-	message="${msg} pids=${allpidl}"$'\n'""$'\n'"${processes}"
+	local IFS=','
+	pidl="${pids[@]} ${ppids[@]}"
+
+	# build a process tree with parent and child
+	processes=$(ps --forest --format 'pid,ppid,user:10,tty,stat,pcpu,nlwp,time,pmem,rss:10,drs:10,size:10,lstart,cmd' --pid=${pidl} --ppid=${pidl})
+	message="$(printf '%s pids = %s\n\n%s' ${msg} ${pidl} ${processes})"
 	logger -p local3.warning "${message}"
 	mail -s "${MYSELF}@${MYNODE} ${msg}" "${NOTIFY}" <<< "${message}"
 }
@@ -35,7 +29,7 @@ MYNODE=$(hostname -f)
 
 # Constants
 PSREX='([0-9]+)\s+([0-9]+)\s+(\w+\s+\w+\s+[0-9]+\s+[0-9]+:[0-9]+:[0-9]+\s+[0-9]+)\s+(.+)'
-CRONTIMEOUT=240
+TIMEOUT=180
 NOTIFY='mymail@example.com'
 
 # Get scheduler processes
@@ -55,10 +49,10 @@ while read process; do
 		cmd="${BASH_REMATCH[4]}"
 
 		# Exclude process with parent = root
-		if [[ ${ppid} > 1 ]]; then
+		if [[ ${ppid} -gt 1 ]]; then
 			# Get process duration (minutes)
 			running=$(($(($(date +%s) - $(date -d "${lstart}" +%s))) / 60))
-			if [[ $running > $CRONTIMEOUT ]]; then
+			if [[ $running -gt $TIMEOUT ]]; then
 				pids[$npid]="${pid}"
 				ppids[$npid]="${ppid}"
 				lstarts[$npid]="${lstart}"
@@ -72,7 +66,7 @@ while read process; do
 done <<< "${pslist}"
 
 # Report processes runnig longer than $CRONTIMEOUT
-if [[ ${npid} > 0 ]]; then
+if [[ ${npid} -gt 0 ]]; then
 	# Log to rsyslog and send warning mail
 	msg='Stuck crontab'
 	notify
